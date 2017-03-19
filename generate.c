@@ -35,6 +35,7 @@ void generate_random_route (map *labyrinth)
     /* We get it. */
     {
       generate_walls_around (labyrinth, next_position);
+      clean_checked (labyrinth);
       return ;
     }
   while (1)
@@ -52,6 +53,7 @@ void generate_random_route (map *labyrinth)
                 }
               generate_walls_around (labyrinth, current_position);
               generate_walls_around (labyrinth, next_position);
+              clean_checked (labyrinth);
               return ;
             }
         }
@@ -111,6 +113,7 @@ void generate_random_route (map *labyrinth)
           current_position = next_position;
         }
 
+
       #ifdef __DEBUG
       print (labyrinth);
       #endif
@@ -136,6 +139,30 @@ void generate_walls_around (map *labyrinth, coordinate position)
           set_land_timestamp (labyrinth, next_position, get_timestamp ());
         }
     }
+}
+
+void clean_checked (map *labyrinth)
+{
+  int i;
+  coordinate position, next_position;
+  for (position.y = 0; position.y < labyrinth->width; position.y++)
+    for (position.x = 0; position.x < labyrinth->height; position.x++)
+      {
+        if (get_land_type (labyrinth, position) == CHECKED)
+          {
+            for (i = 0; i < TOTAL_DIRECTIONS; i++)
+              {
+                next_position = get_adjacent (position, i);
+                if (is_in_map (labyrinth, next_position) && (get_land_type (labyrinth, next_position) == ROAD || get_land_type (labyrinth, next_position) == ENTRANCE || get_land_type (labyrinth, next_position) == EXIT))
+                  {
+                    set_land_type (labyrinth, position, WALL);
+                    break;
+                  }
+              }
+            if (i == TOTAL_DIRECTIONS)
+              set_land_type (labyrinth, position, LAND);
+          }
+      }
 }
 
 

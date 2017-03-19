@@ -11,6 +11,8 @@ void generate_branches (map *labyrinth);
 
 void generate_walls_around (map *labyrinth, coordinate position);
 
+void clean_checked (map *labyrinth);
+
 int get_random_direction ();
 
 void reset_random_direction ();
