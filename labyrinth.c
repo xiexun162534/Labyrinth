@@ -6,8 +6,8 @@
 int main (void)
 {
   map *labyrinth;
-  coordinate entrance_position = {0,0}, exit_position = {19, 19};
-  labyrinth = generate (20, 20, entrance_position, exit_position);
+  coordinate entrance_position = {0,0}, exit_position = {34, 28};
+  labyrinth = generate (35, 29, entrance_position, exit_position);
   print (labyrinth);
 
   exit (0);

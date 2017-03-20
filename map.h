@@ -13,6 +13,7 @@
 #define DOWN 3
 #define TOTAL_DIRECTIONS 4
 
+
 typedef struct __COORDINATE
 {
   int x;

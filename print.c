@@ -3,11 +3,13 @@
 void print (map *labyrinth)
 {
   int i, j;
-  for (i = 0; i < labyrinth->height; i++)
+  for (j = 0; j < labyrinth->height; j++)
     {
-      for (j = 0; j < labyrinth->width; j++)
+      for (i = 0; i < labyrinth->width; i++)
         {
-          coordinate position = {i, j};
+          coordinate position;
+          position.x = i;
+          position.y = j;
           switch (get_land_type (labyrinth, position))
             {
             case ROAD:
