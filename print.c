@@ -13,7 +13,7 @@ void print (map *labyrinth)
           switch (get_land_type (labyrinth, position))
             {
             case ROAD:
-              putchar ('R');
+              putchar (' ');
               break;
             case WALL:
               putchar ('W');
