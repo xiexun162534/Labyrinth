@@ -3,7 +3,10 @@
 
 #define CHECKED 100
 #define AVERAGE_FORK_RATE 0.30
-#define PROBABILITY_FORK_AGAIN 0.2
+#define SHORT_ROAD 8
+#define PROBABILITY_FORK_SHORT_ROAD 0.2
+#define FORK_AGAIN_REDUCTION 0.8
+#define ADJACENT_FORK_AGAIN_REDUCTION 0.6
 #define MIN_PROBABILITY_PRECISION 0.01
 #define MAX_FORK_PROBABILITY 0.99
 #define PROBABILITY_GO_AHEAD 0.99
@@ -32,7 +35,13 @@ void generate_walls_around (map *labyrinth, coordinate position);
 
 int break_wall (map *labyrinth, road *current_road, coordinate *position_p);
 
-int weighted_get_num (int count, double sum, double *probability_list);
+void weighted_init (int new_count);
+
+int weighted_get ();
+
+void weighted_adjust (int index);
+
+int weighted_remove (int index);
 
 double fall_function (double x);
 

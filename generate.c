@@ -3,6 +3,7 @@
 #include "generate.h"
 #include "timestamp.h"
 
+#define __DEBUG_LESS
 #ifdef __DEBUG
 #include "print.h"
 #endif
@@ -19,9 +20,26 @@ map *generate (int width, int height, coordinate entrance_position, coordinate e
   set_exit (labyrinth, exit_position);
 
   reset_timestamp ();
+
+  #ifdef __DEBUG_LESS
+  {
+    clock_t seed = clock ();
+    seed = 3337;
+    printf ("WATCH HERE: %ld!!!!!!!!!!!!!!!!!!!\n", seed);
+    srand (seed);
+  }
+  #else
   srand (clock ());
+  #endif
 
   max_road_length = labyrinth->width * labyrinth->height;
+  main_road.length = 0;
+  main_road.list = (coordinate *) malloc (sizeof (coordinate) * max_road_length);
+  if (!main_road.list)
+    {
+      printf ("ERROR: Cannot allocate memory.\n");
+      exit (1);
+    }
   generate_main_road (labyrinth);
 
   /* Ignore entrance and exit */
@@ -32,6 +50,8 @@ map *generate (int width, int height, coordinate entrance_position, coordinate e
   set_land_type (labyrinth, labyrinth->entrance_position, ENTRANCE);
   set_land_type (labyrinth, labyrinth->exit_position, EXIT);
 
+  free (main_road.list);
+
   return labyrinth;
 }
 
@@ -40,39 +60,29 @@ void generate_main_road (map *labyrinth)
   coordinate current_position, next_position;
   int i;
 
-  main_road.length = 0;
-  main_road.list = (coordinate *) malloc (sizeof (coordinate) * max_road_length);
-  if (!main_road.list)
-    {
-      printf ("ERROR: Cannot allocate memory.\n");
-      exit (1);
-    }
-
+  /* Go from entrance */
   current_position = labyrinth->entrance_position;
   set_land_timestamp (labyrinth, current_position, get_timestamp ());
+  generate_walls_around (labyrinth, current_position);
   main_road.list[main_road.length] = current_position;
   main_road.length++;
+
   if (get_land_type (labyrinth, current_position) == EXIT)
-    /* We get it. */
+    /* The entrance is also the exit. */
     {
-      generate_walls_around (labyrinth, current_position);
-      clean_checked (labyrinth);
       return ;
     }
+
+
   while (1)
     {
+      /* Check whether the exit is adjacent to current position. If so, return. */
       for (i = 0; i < TOTAL_DIRECTIONS; i++)
         {
           next_position = get_adjacent (current_position, i);
           if (is_in_map (labyrinth, next_position) && get_land_type (labyrinth, next_position) == EXIT)
             /* We get it. */
             {
-              if (get_land_type (labyrinth, current_position) != ENTRANCE && get_land_type (labyrinth, current_position) != EXIT)
-                {
-                  set_land_type (labyrinth, current_position, ROAD);
-                  set_land_timestamp (labyrinth, current_position, get_timestamp ());
-                }
-              generate_walls_around (labyrinth, current_position);
               generate_walls_around (labyrinth, next_position);
               main_road.list[main_road.length] = next_position;
               main_road.length++;
@@ -101,10 +111,10 @@ void generate_branches_along (map *labyrinth, road *current_road)
   coordinate current_position;
   max_road_length -= current_road->length;
   current_road->forks = 0;
-  current_road->fork_list = (int *) malloc (sizeof (int) * TOTAL_DIRECTIONS * current_road->length);
+  /*current_road->fork_list = (int *) malloc (sizeof (int) * TOTAL_DIRECTIONS * current_road->length);*/
   branch.length = 0;
   branch.list = malloc (sizeof (coordinate) * max_road_length);
-  if (!current_road->fork_list || !branch.list)
+  if (!branch.list)
     {
       printf ("ERROR: Cannot allocate memory.\n");
       exit (1);
@@ -112,14 +122,14 @@ void generate_branches_along (map *labyrinth, road *current_road)
 
   while (break_wall (labyrinth, current_road, &current_position))
     {
+      branch.list[branch.length] = current_position;
+      branch.length++;
+
       while (probability_event (PROBABILITY_GO_AHEAD))
         {
           #ifdef __DEBUG
           print (labyrinth);
           #endif
- 
-          branch.list[branch.length] = current_position;
-          branch.length++;
 
           if (!go_ahead (labyrinth, &branch, &current_position))
             {
@@ -127,7 +137,6 @@ void generate_branches_along (map *labyrinth, road *current_road)
                 {
                   if (!go_back (labyrinth, &branch, &current_position))
                     {
-                      generate_walls_around (labyrinth, current_position);
                       clean_checked (labyrinth);
                       branch.length = 0;
                       break;
@@ -135,25 +144,24 @@ void generate_branches_along (map *labyrinth, road *current_road)
                 }
               else
                 {
-                  generate_walls_around (labyrinth, current_position);
                   clean_checked (labyrinth);
                   generate_branches_along (labyrinth, &branch);
                   branch.length = 0;
                   break;
                 }
             }
-          else
-            {
-              generate_walls_around (labyrinth, current_position);
-            }
         }
     }
-
   max_road_length += current_road->length;
+  /*  free (current_road->fork_list);*/
+  /*free (branch.list);*/
 }
 
 int go_ahead (map *labyrinth, road *current_road, coordinate *current_position_p)
 {
+  #ifdef __DEBUG
+  printf ("go_ahead\n");
+  #endif
   int i;
   coordinate next_position;
   /* Choose a way randomly */
@@ -161,39 +169,32 @@ int go_ahead (map *labyrinth, road *current_road, coordinate *current_position_p
   for (i = 0; i < TOTAL_DIRECTIONS; i++)
     {
       next_position = get_adjacent (*current_position_p, get_random_direction ());
-      if (is_in_map (labyrinth, next_position) && get_land_type (labyrinth, next_position) == LAND)
+      if (is_in_map (labyrinth, next_position) && get_land_type (labyrinth, next_position) == WALL && get_land_timestamp (labyrinth, next_position) > get_land_timestamp (labyrinth, *current_position_p))
         break;
     }
   if (i == TOTAL_DIRECTIONS)
     /* No way */
     return 0;
 
-  if (get_land_type (labyrinth, *current_position_p) != ENTRANCE && get_land_type (labyrinth, *current_position_p) != EXIT)
-    {
-      set_land_type (labyrinth, *current_position_p, ROAD);
-      set_land_timestamp (labyrinth, *current_position_p, get_timestamp ());
-    }
-  generate_walls_around (labyrinth, *current_position_p);
-  *current_position_p = next_position;
-  current_road->list[current_road->length] = *current_position_p;
+  set_land_type (labyrinth, next_position, ROAD);
+  set_land_timestamp (labyrinth, next_position, get_timestamp ());
+  generate_walls_around (labyrinth, next_position);
+  current_road->list[current_road->length] = next_position;
   current_road->length++;
+  *current_position_p = next_position;
   return 1;
 }
 
 int go_back (map *labyrinth, road *current_road, coordinate *current_position_p)
 {
+  #ifdef __DEBUG
+  printf ("go_back\n");
+  #endif
   int i;
   coordinate position;
   if (current_road->length == 1)
     /* No way to go back */
     return 0;
-
-  current_road->length--;
-  position = current_road->list[current_road->length - 1];
-
-  set_land_type (labyrinth, *current_position_p, CHECKED);
-  set_land_timestamp (labyrinth, *current_position_p, get_timestamp ());
-  *current_position_p = position;
 
   /* Remove walls that are generated after we go through current position */
   for (i = 0; i < TOTAL_DIRECTIONS; i++)
@@ -206,11 +207,22 @@ int go_back (map *labyrinth, road *current_road, coordinate *current_position_p)
         }
     }
 
+  current_road->length--;
+  position = current_road->list[current_road->length - 1];
+
+  set_land_type (labyrinth, *current_position_p, CHECKED);
+  set_land_timestamp (labyrinth, *current_position_p, get_timestamp ());
+  *current_position_p = position;
+
+
   return 1;
 }
 
 void generate_walls_around (map *labyrinth, coordinate position)
 {
+  #ifdef __DEBUG
+  printf ("generate_walls_around\n");
+  #endif
   int i;
   for (i = 0; i < TOTAL_DIRECTIONS; i++)
     {
@@ -254,41 +266,30 @@ void clean_checked (map *labyrinth)
 /* Determine whether we have to break a wall alongside the road. If we determine to break a wall, get the position of wall and return 1. Otherwise, return 0. */
 int break_wall (map *labyrinth, road *current_road, coordinate *position_p)
 {
+  #ifdef __DEBUG
+  printf ("break_wall\n");
+  #endif
   int i;
-  static double sum;
-  static double *probability_list = NULL;
   coordinate current_position, next_position;
 
-  if (!probability_event (fall_function ((double) current_road->forks / (double) current_road->length)))
+  if (current_road->length <= SHORT_ROAD)
+    {
+      if (!probability_event (PROBABILITY_FORK_SHORT_ROAD))
+        return 0;
+    }
+  else if (!probability_event (fall_function ((double) current_road->forks / (double) current_road->length)))
     /* Done. */
     return 0;
 
   if (current_road->forks == 0)
     {
-      if (!probability_list)
-        free (probability_list);
-      probability_list = (double *) malloc (sizeof (double) * current_road->length);
-      if (!probability_list)
-        {
-          printf ("ERROR: Cannot allocate memory.\n");
-          exit (1);
-        }
-
-      /* Ignore two ends of the road */
-      probability_list[0] = 0.0;
-      probability_list[current_road->length - 1] = 0.0;
-
-      for (i = 1; i < current_road->length - 1; i++)
-        {
-          probability_list[i] = 1.0;
-        }
-      sum = (double) current_road->length - 2.0;
+      weighted_init (current_road->length);
     }
 
   while (1)
     {
       int index;
-      index = weighted_get_num (current_road->length, sum, probability_list);
+      index = weighted_get ();
       current_position = current_road->list[index];
 
       reset_random_direction ();
@@ -300,8 +301,8 @@ int break_wall (map *labyrinth, road *current_road, coordinate *position_p)
               set_land_type (labyrinth, next_position, ROAD);
               set_land_timestamp (labyrinth, next_position, get_timestamp ());
               current_road->forks++;
-              sum -= probability_list[index] - PROBABILITY_FORK_AGAIN;
-              probability_list[index] = PROBABILITY_FORK_AGAIN;
+              weighted_adjust (index);
+              generate_walls_around (labyrinth, next_position);
               *position_p = next_position;
               return 1;
             }
@@ -309,16 +310,41 @@ int break_wall (map *labyrinth, road *current_road, coordinate *position_p)
 
       if (i == TOTAL_DIRECTIONS)
         {
-          sum -= probability_list[index] - 0.0;
-          probability_list[index] = 0.0;
-          if (sum < MIN_PROBABILITY_PRECISION)
+          if (!weighted_remove (index))
             return 0;
         }
     }
 }
 
 
-int weighted_get_num (int count, double sum, double *probability_list)
+static double sum;
+static double *weight_list = NULL;
+static int count;
+void weighted_init (int new_count)
+{
+  int i;
+  count = new_count;
+  if (!weight_list)
+    free (weight_list);
+  weight_list = (double *) malloc (sizeof (double) * count);
+  if (!weight_list)
+    {
+      printf ("ERROR: Cannot allocate memory.\n");
+      exit (1);
+    }
+
+  /* Ignore two ends */
+  weight_list[0] = 0.0;
+  weight_list[count - 1] = 0.0;
+
+  for (i = 1; i < count - 1; i++)
+    {
+      weight_list[i] = 1.0;
+    }
+  sum = (double) count - 2.0;
+}
+
+int weighted_get ()
 {
   int i;
   double num;
@@ -327,11 +353,39 @@ int weighted_get_num (int count, double sum, double *probability_list)
   num = sum * (double) rand () / (double) RAND_MAX;
   for (i = 0; i < count; i++)
     {
-      current_sum += probability_list[i];
+      current_sum += weight_list[i];
       if (current_sum > num)
         break;
     }
+  if (i >= count -1)
+    i = count - 2;
   return i;
+}
+
+void weighted_adjust (int index)
+{
+  int i;
+  sum -= weight_list[index] * FORK_AGAIN_REDUCTION;
+  weight_list[index] = weight_list[index] - FORK_AGAIN_REDUCTION * weight_list[index];
+  for (i = -2; i <= 2; i++)
+    {
+      if (i != 0 && index + i >= 0 && index + i < count)
+        {
+          sum -= weight_list[index + i] * ADJACENT_FORK_AGAIN_REDUCTION;
+          weight_list[index + i] = weight_list[index + i] - ADJACENT_FORK_AGAIN_REDUCTION * weight_list[index + i];
+        }
+    }
+}
+
+/* If all weight in the list falls to zero, return 0. */
+int weighted_remove (int index)
+{
+  sum -= weight_list[index];
+  weight_list[index] = 0.0;
+  if (sum < MIN_PROBABILITY_PRECISION)
+    return 0;
+  else
+    return 1;
 }
 
 
