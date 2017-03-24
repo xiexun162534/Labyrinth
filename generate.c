@@ -1,9 +1,8 @@
 #include "labyrinth.h"
-#include "map.h"
-#include "generate.h"
 #include "timestamp.h"
+#include "generate.h"
 
-#define __DEBUG_LESS
+
 #ifdef __DEBUG
 #include "print.h"
 #endif
@@ -111,6 +110,7 @@ void generate_branches_along (map *labyrinth, road *current_road)
   coordinate current_position;
   max_road_length -= current_road->length;
   current_road->forks = 0;
+  current_road->data = weighted_init (current_road->length);
   /*current_road->fork_list = (int *) malloc (sizeof (int) * TOTAL_DIRECTIONS * current_road->length);*/
   branch.length = 0;
   branch.list = malloc (sizeof (coordinate) * max_road_length);
@@ -153,8 +153,9 @@ void generate_branches_along (map *labyrinth, road *current_road)
         }
     }
   max_road_length += current_road->length;
-  /*  free (current_road->fork_list);*/
-  /*free (branch.list);*/
+  /*free (current_road->fork_list);*/
+  free (current_road->data);
+  free (branch.list);
 }
 
 int go_ahead (map *labyrinth, road *current_road, coordinate *current_position_p)
@@ -277,19 +278,15 @@ int break_wall (map *labyrinth, road *current_road, coordinate *position_p)
       if (!probability_event (PROBABILITY_FORK_SHORT_ROAD))
         return 0;
     }
-  else if (!probability_event (fall_function ((double) current_road->forks / (double) current_road->length)))
+  else if (!probability_event (fall_function ((double) current_road->forks / ((double) current_road->length * 2)) / fall_function (((double) current_road->forks - 1) / ((double) current_road->length * 2))))
     /* Done. */
     return 0;
 
-  if (current_road->forks == 0)
-    {
-      weighted_init (current_road->length);
-    }
 
   while (1)
     {
       int index;
-      index = weighted_get ();
+      index = weighted_get (current_road->data);
       current_position = current_road->list[index];
 
       reset_random_direction ();
@@ -301,7 +298,7 @@ int break_wall (map *labyrinth, road *current_road, coordinate *position_p)
               set_land_type (labyrinth, next_position, ROAD);
               set_land_timestamp (labyrinth, next_position, get_timestamp ());
               current_road->forks++;
-              weighted_adjust (index);
+              weighted_adjust (current_road->data, index);
               generate_walls_around (labyrinth, next_position);
               *position_p = next_position;
               return 1;
@@ -310,83 +307,12 @@ int break_wall (map *labyrinth, road *current_road, coordinate *position_p)
 
       if (i == TOTAL_DIRECTIONS)
         {
-          if (!weighted_remove (index))
+          if (!weighted_remove (current_road->data, index))
             return 0;
         }
     }
 }
 
-
-static double sum;
-static double *weight_list = NULL;
-static int count;
-void weighted_init (int new_count)
-{
-  int i;
-  count = new_count;
-  if (!weight_list)
-    free (weight_list);
-  weight_list = (double *) malloc (sizeof (double) * count);
-  if (!weight_list)
-    {
-      printf ("ERROR: Cannot allocate memory.\n");
-      exit (1);
-    }
-
-  /* Ignore two ends */
-  weight_list[0] = 0.0;
-  weight_list[count - 1] = 0.0;
-
-  for (i = 1; i < count - 1; i++)
-    {
-      weight_list[i] = 1.0;
-    }
-  sum = (double) count - 2.0;
-}
-
-int weighted_get ()
-{
-  int i;
-  double num;
-  double current_sum;
-  current_sum = 0.0;
-  num = sum * (double) rand () / (double) RAND_MAX;
-  for (i = 0; i < count; i++)
-    {
-      current_sum += weight_list[i];
-      if (current_sum > num)
-        break;
-    }
-  if (i >= count -1)
-    i = count - 1;
-  return i;
-}
-
-void weighted_adjust (int index)
-{
-  int i;
-  sum -= weight_list[index] * FORK_AGAIN_REDUCTION;
-  weight_list[index] = weight_list[index] - FORK_AGAIN_REDUCTION * weight_list[index];
-  for (i = -2; i <= 2; i++)
-    {
-      if (i != 0 && index + i >= 0 && index + i < count)
-        {
-          sum -= weight_list[index + i] * ADJACENT_FORK_AGAIN_REDUCTION;
-          weight_list[index + i] = weight_list[index + i] - ADJACENT_FORK_AGAIN_REDUCTION * weight_list[index + i];
-        }
-    }
-}
-
-/* If all weight in the list falls to zero, return 0. */
-int weighted_remove (int index)
-{
-  sum -= weight_list[index];
-  weight_list[index] = 0.0;
-  if (sum < MIN_PROBABILITY_PRECISION)
-    return 0;
-  else
-    return 1;
-}
 
 
 /*
