@@ -3,7 +3,7 @@
 #include "generate.h"
 #include "timestamp.h"
 
-#define __DEBUG_LESS
+
 #ifdef __DEBUG
 #include "print.h"
 #endif
