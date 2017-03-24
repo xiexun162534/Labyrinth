@@ -3,7 +3,7 @@
 #include "generate.h"
 #include "timestamp.h"
 
-
+#define __DEBUG_LESS
 #ifdef __DEBUG
 #include "print.h"
 #endif
@@ -24,7 +24,7 @@ map *generate (int width, int height, coordinate entrance_position, coordinate e
   #ifdef __DEBUG_LESS
   {
     clock_t seed = clock ();
-    seed = 3337;
+    seed = 187;
     printf ("WATCH HERE: %ld!!!!!!!!!!!!!!!!!!!\n", seed);
     srand (seed);
   }
@@ -358,7 +358,7 @@ int weighted_get ()
         break;
     }
   if (i >= count -1)
-    i = count - 2;
+    i = count - 1;
   return i;
 }
 
