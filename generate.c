@@ -8,13 +8,23 @@
 #endif
 
 
+
 static road main_road;
 static int max_road_length;
-
 map *generate (int width, int height, coordinate entrance_position, coordinate exit_position)
 {
+  extended_map *extended_labyrinth;
   map *labyrinth;
+  extended_labyrinth = malloc (sizeof (extended_map));
   labyrinth = create_empty_map (width, height);
+  extended_labyrinth->labyrinth = labyrinth;
+  extended_labyrinth->checked_list = malloc (sizeof (coordinate) * width * height);
+  if (!extended_labyrinth->checked_list)
+    {
+      printf ("ERROR: Cannot allocate memory.\n");
+      exit (1);
+    }
+  extended_labyrinth->checked_count = 0;
   set_entrance (labyrinth, entrance_position);
   set_exit (labyrinth, exit_position);
 
@@ -31,7 +41,7 @@ map *generate (int width, int height, coordinate entrance_position, coordinate e
   srand (clock ());
   #endif
 
-  max_road_length = labyrinth->width * labyrinth->height;
+  max_road_length = width * height;
   main_road.length = 0;
   main_road.list = (coordinate *) malloc (sizeof (coordinate) * max_road_length);
   if (!main_road.list)
@@ -39,30 +49,32 @@ map *generate (int width, int height, coordinate entrance_position, coordinate e
       printf ("ERROR: Cannot allocate memory.\n");
       exit (1);
     }
-  generate_main_road (labyrinth);
+  generate_main_road (extended_labyrinth);
 
   /* Ignore entrance and exit */
   set_land_type (labyrinth, labyrinth->entrance_position, ROAD);
   set_land_type (labyrinth, labyrinth->exit_position, ROAD);
-  generate_branches_along (labyrinth, &main_road);
+  generate_branches_along (extended_labyrinth, &main_road);
   /* Mark entrance and exit */
   set_land_type (labyrinth, labyrinth->entrance_position, ENTRANCE);
   set_land_type (labyrinth, labyrinth->exit_position, EXIT);
 
   free (main_road.list);
+  free (extended_labyrinth->checked_list);
 
   return labyrinth;
 }
 
-void generate_main_road (map *labyrinth)
+void generate_main_road (extended_map *extended_labyrinth)
 {
   coordinate current_position, next_position;
   int i;
+  map *labyrinth = extended_labyrinth->labyrinth;
 
   /* Go from entrance */
   current_position = labyrinth->entrance_position;
   set_land_timestamp (labyrinth, current_position, get_timestamp ());
-  generate_walls_around (labyrinth, current_position);
+  generate_walls_around (extended_labyrinth, current_position);
   main_road.list[main_road.length] = current_position;
   main_road.length++;
 
@@ -82,19 +94,19 @@ void generate_main_road (map *labyrinth)
           if (is_in_map (labyrinth, next_position) && get_land_type (labyrinth, next_position) == EXIT)
             /* We get it. */
             {
-              generate_walls_around (labyrinth, next_position);
+              generate_walls_around (extended_labyrinth, next_position);
               main_road.list[main_road.length] = next_position;
               main_road.length++;
-              clean_checked (labyrinth);
+              clean_checked (extended_labyrinth);
               return ;
             }
         }
 
       /* Choose a way randomly */
-      if (!go_ahead (labyrinth, &main_road, &current_position))
+      if (!go_ahead (extended_labyrinth, &main_road, &current_position))
         /* There's no way to go. We have to go back. */
         {
-          if (!go_back (labyrinth, &main_road, &current_position))
+          if (!go_back (extended_labyrinth, &main_road, &current_position))
             {
               printf ("ERROR: Are you kidding?\n");
               exit (3);
@@ -104,10 +116,11 @@ void generate_main_road (map *labyrinth)
 }
 
 
-void generate_branches_along (map *labyrinth, road *current_road)
+void generate_branches_along (extended_map *extended_labyrinth, road *current_road)
 {
   road branch;
   coordinate current_position;
+  map *labyrinth = extended_labyrinth->labyrinth;
   max_road_length -= current_road->length;
   current_road->forks = 0;
   current_road->data = weighted_init (current_road->length);
@@ -120,7 +133,7 @@ void generate_branches_along (map *labyrinth, road *current_road)
       exit (1);
     }
 
-  while (break_wall (labyrinth, current_road, &current_position))
+  while (break_wall (extended_labyrinth, current_road, &current_position))
     {
       branch.list[branch.length] = current_position;
       branch.length++;
@@ -131,21 +144,21 @@ void generate_branches_along (map *labyrinth, road *current_road)
           print (labyrinth);
           #endif
 
-          if (!go_ahead (labyrinth, &branch, &current_position))
+          if (!go_ahead (extended_labyrinth, &branch, &current_position))
             {
               if (probability_event (PROBABILITY_GO_BACK))
                 {
-                  if (!go_back (labyrinth, &branch, &current_position))
+                  if (!go_back (extended_labyrinth, &branch, &current_position))
                     {
-                      clean_checked (labyrinth);
+                      clean_checked (extended_labyrinth);
                       branch.length = 0;
                       break;
                     }
                 }
               else
                 {
-                  clean_checked (labyrinth);
-                  generate_branches_along (labyrinth, &branch);
+                  clean_checked (extended_labyrinth);
+                  generate_branches_along (extended_labyrinth, &branch);
                   branch.length = 0;
                   break;
                 }
@@ -158,13 +171,14 @@ void generate_branches_along (map *labyrinth, road *current_road)
   free (branch.list);
 }
 
-int go_ahead (map *labyrinth, road *current_road, coordinate *current_position_p)
+int go_ahead (extended_map *extended_labyrinth, road *current_road, coordinate *current_position_p)
 {
   #ifdef __DEBUG
   printf ("go_ahead\n");
   #endif
   int i;
   coordinate next_position;
+  map *labyrinth = extended_labyrinth->labyrinth;
   /* Choose a way randomly */
   reset_random_direction ();
   for (i = 0; i < TOTAL_DIRECTIONS; i++)
@@ -179,20 +193,21 @@ int go_ahead (map *labyrinth, road *current_road, coordinate *current_position_p
 
   set_land_type (labyrinth, next_position, ROAD);
   set_land_timestamp (labyrinth, next_position, get_timestamp ());
-  generate_walls_around (labyrinth, next_position);
+  generate_walls_around (extended_labyrinth, next_position);
   current_road->list[current_road->length] = next_position;
   current_road->length++;
   *current_position_p = next_position;
   return 1;
 }
 
-int go_back (map *labyrinth, road *current_road, coordinate *current_position_p)
+int go_back (extended_map *extended_labyrinth, road *current_road, coordinate *current_position_p)
 {
   #ifdef __DEBUG
   printf ("go_back\n");
   #endif
   int i;
   coordinate position;
+  map *labyrinth = extended_labyrinth->labyrinth;
   if (current_road->length == 1)
     /* No way to go back */
     return 0;
@@ -213,18 +228,21 @@ int go_back (map *labyrinth, road *current_road, coordinate *current_position_p)
 
   set_land_type (labyrinth, *current_position_p, CHECKED);
   set_land_timestamp (labyrinth, *current_position_p, get_timestamp ());
-  *current_position_p = position;
+  extended_labyrinth->checked_list[extended_labyrinth->checked_count] = *current_position_p;
+  extended_labyrinth->checked_count++;
 
+  *current_position_p = position;
 
   return 1;
 }
 
-void generate_walls_around (map *labyrinth, coordinate position)
+void generate_walls_around (extended_map *extended_labyrinth, coordinate position)
 {
   #ifdef __DEBUG
   printf ("generate_walls_around\n");
   #endif
   int i;
+  map *labyrinth = extended_labyrinth->labyrinth;
   for (i = 0; i < TOTAL_DIRECTIONS; i++)
     {
       coordinate next_position = get_adjacent (position, i);
@@ -236,42 +254,43 @@ void generate_walls_around (map *labyrinth, coordinate position)
     }
 }
 
-void clean_checked (map *labyrinth)
+void clean_checked (extended_map *extended_labyrinth)
 {
-  int i;
+  int i, j;
   coordinate position, next_position;
-  for (position.y = 0; position.y < labyrinth->height; position.y++)
-    for (position.x = 0; position.x < labyrinth->width; position.x++)
-      {
-        if (get_land_type (labyrinth, position) == CHECKED)
-          {
-            for (i = 0; i < TOTAL_DIRECTIONS; i++)
-              {
-                next_position = get_adjacent (position, i);
-                if (is_in_map (labyrinth, next_position) && (get_land_type (labyrinth, next_position) == ROAD || get_land_type (labyrinth, next_position) == ENTRANCE || get_land_type (labyrinth, next_position) == EXIT))
-                  {
-                    set_land_type (labyrinth, position, WALL);
-                    set_land_timestamp (labyrinth, position, get_timestamp ());
-                    break;
-                  }
-              }
-            if (i == TOTAL_DIRECTIONS)
-              {
-                set_land_type (labyrinth, position, LAND);
-                set_land_timestamp (labyrinth, position, 0);
-              }
-          }
-      }
+  map *labyrinth = extended_labyrinth->labyrinth;
+
+  for (i = 0; i < extended_labyrinth->checked_count; i++)
+    {
+      position = extended_labyrinth->checked_list[i];
+      for (j = 0; j < TOTAL_DIRECTIONS; j++)
+        {
+          next_position = get_adjacent (position, j);
+          if (is_in_map (labyrinth, next_position) && (get_land_type (labyrinth, next_position) == ROAD || get_land_type (labyrinth, next_position) == ENTRANCE || get_land_type (labyrinth, next_position) == EXIT))
+            {
+              set_land_type (labyrinth, position, WALL);
+              set_land_timestamp (labyrinth, position, get_timestamp ());
+              break;
+            }
+        }
+      if (j == TOTAL_DIRECTIONS)
+        {
+          set_land_type (labyrinth, position, LAND);
+          set_land_timestamp (labyrinth, position, 0);
+        }
+    }
+  extended_labyrinth->checked_count = 0;
 }
 
 /* Determine whether we have to break a wall alongside the road. If we determine to break a wall, get the position of wall and return 1. Otherwise, return 0. */
-int break_wall (map *labyrinth, road *current_road, coordinate *position_p)
+int break_wall (extended_map *extended_labyrinth, road *current_road, coordinate *position_p)
 {
   #ifdef __DEBUG
   printf ("break_wall\n");
   #endif
   int i;
   coordinate current_position, next_position;
+  map *labyrinth = extended_labyrinth->labyrinth;
 
   if (current_road->length <= SHORT_ROAD)
     {
@@ -299,7 +318,7 @@ int break_wall (map *labyrinth, road *current_road, coordinate *position_p)
               set_land_timestamp (labyrinth, next_position, get_timestamp ());
               current_road->forks++;
               weighted_adjust (current_road->data, index);
-              generate_walls_around (labyrinth, next_position);
+              generate_walls_around (extended_labyrinth, next_position);
               *position_p = next_position;
               return 1;
             }
