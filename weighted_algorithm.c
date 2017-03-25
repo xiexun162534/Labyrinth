@@ -3,71 +3,126 @@
 #include "generate.h"
 
 
-weighted_data *weighted_init (int count)
+weighted_tree *weighted_init (int count)
 {
-  weighted_data *current_data;
-  int i;
+  weighted_tree *current_tree;
+  int i, j;
+  int base;
 
-  current_data = malloc (sizeof (weighted_data));
-  current_data->count = count;
-  current_data->weight_list = (double *) malloc (sizeof (double) * current_data->count);
-  if (!current_data->weight_list)
+  current_tree = malloc (sizeof (weighted_tree));
+  current_tree->count = count;
+
+  i = 0;
+  j = count;
+  while (j > 0)
+    {
+      j = PARENT (j);
+      i = CHILD (1, i);
+    }
+
+  base = i;
+  current_tree->base = i;
+
+  current_tree->data = (double *) malloc (sizeof (double) * (current_tree->count +  current_tree->base));
+  if (!current_tree->data)
     {
       printf ("ERROR: Cannot allocate memory.\n");
       exit (1);
     }
 
-  /* Ignore two ends */
-  current_data->weight_list[0] = 0.0;
-  current_data->weight_list[count - 1] = 0.0;
-
-  for (i = 1; i < count - 1; i++)
+  for (i = 0; i < base + count; i++)
     {
-      current_data->weight_list[i] = 1.0;
+      current_tree->data[i] = 0.0;
     }
-  current_data->sum = (double) count - 2.0;
-  return current_data;
+
+  /* Ignore two ends */
+  for (i = base + 1; i < base + count - 1; i++)
+    {
+      j = i;
+      while (j >= 0)
+        {
+          current_tree->data[j] += 1.0;
+          j = (j == 0) ? -1 : PARENT (j);
+        }
+    }
+
+  return current_tree;
 }
 
-int weighted_get (weighted_data *current_data)
+int weighted_get (weighted_tree *current_tree)
 {
   int i;
+  int index;
   double num;
   double current_sum;
-  current_sum = 0.0;
-  num = current_data->sum * (double) rand () / (double) RAND_MAX;
-  for (i = 0; i < current_data->count; i++)
+  num = current_tree->data[0] * (double) rand () / (double) RAND_MAX;
+  index = 0;
+  current_sum = 0;
+
+  while (index < current_tree->base)
     {
-      current_sum += current_data->weight_list[i];
-      if (current_sum > num)
-        break;
+      for (i = 1; i <= N; i++)
+        {
+          if (current_sum + current_tree->data[CHILD (i, index)] > num)
+            {
+              index = CHILD (i, index);
+              break;
+            }
+          else
+            current_sum += current_tree->data[CHILD (i, index)];
+        }
+      if (i == N + 1)
+        index = CHILD (N, index);
     }
-  if (i >= current_data->count -1)
-    i = current_data->count - 1;
-  return i;
+
+  if (index - current_tree->base >= current_tree->count)
+    printf ("%d,%d,OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOH!\n", index - current_tree->base, current_tree->count);
+  return index - current_tree->base;
 }
 
-void weighted_adjust (weighted_data *current_data, int index)
+void weighted_adjust (weighted_tree *current_tree, int index)
 {
   int i;
-  current_data->sum -= current_data->weight_list[index] * FORK_AGAIN_REDUCTION;
-  current_data->weight_list[index] = current_data->weight_list[index] - FORK_AGAIN_REDUCTION * current_data->weight_list[index];
+  int j;
+  double delta;
+
+  j = index + current_tree->base;
+  delta = FORK_AGAIN_REDUCTION * current_tree->data[j];
+  while (j >= 0)
+    {
+      current_tree->data[j] -= delta;
+      j = (j == 0) ? -1 : PARENT (j);
+    }
+
   for (i = -2; i <= 2; i++)
     {
-      if (i != 0 && index + i >= 0 && index + i < current_data->count)
+      if (i != 0 && index + i >= 0 && index + i < current_tree->count)
         {
-          current_data->sum -= current_data->weight_list[index + i] * ADJACENT_FORK_AGAIN_REDUCTION;
-          current_data->weight_list[index + i] = current_data->weight_list[index + i] - ADJACENT_FORK_AGAIN_REDUCTION * current_data->weight_list[index + i];
+          j = index + i + current_tree->base;
+          delta = ADJACENT_FORK_AGAIN_REDUCTION * current_tree->data[j];
+          while (j >= 0)
+            {
+              current_tree->data[j] -= delta;
+              j = (j == 0) ? -1 : PARENT (j);
+            }
         }
     }
 }
 
 /* If all weight in the list falls to zero, return 0. */
-int weighted_remove (weighted_data *current_data, int index)
+int weighted_remove (weighted_tree *current_tree, int index)
 {
-  current_data->sum -= current_data->weight_list[index];
-  current_data->weight_list[index] = 0.0;
-  if (current_data->sum < MIN_PROBABILITY_PRECISION)
+  int i;
+  double delta;
+  i = index + current_tree->base;
+  delta = current_tree->data[i];
+  while (i >= 0)
+    {
+      current_tree->data[i] -= delta;
+      i = (i == 0) ? -1 : PARENT (i);
+    }
+  
+  if (current_tree->data[0] < MIN_PROBABILITY_PRECISION)
     return 0;
   else
     return 1;

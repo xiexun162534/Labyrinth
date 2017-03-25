@@ -9,7 +9,7 @@
 #define ADJACENT_FORK_AGAIN_REDUCTION 0.6
 #define MIN_PROBABILITY_PRECISION 0.01
 #define MAX_FORK_PROBABILITY 0.99
-#define PROBABILITY_GO_AHEAD 0.95
+#define PROBABILITY_GO_AHEAD 0.999
 #define PROBABILITY_GO_BACK 0.1
 
 #include "map.h"
@@ -28,7 +28,7 @@ typedef struct __ROAD
   int length;
   coordinate *list;
   int *fork_list;
-  weighted_data *data;
+  weighted_tree *weighted;
 } road;
 
 map *generate (int width, int height, coordinate entrance_position, coordinate exit_position);

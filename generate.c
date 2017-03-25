@@ -123,7 +123,7 @@ void generate_branches_along (extended_map *extended_labyrinth, road *current_ro
   map *labyrinth = extended_labyrinth->labyrinth;
   max_road_length -= current_road->length;
   current_road->forks = 0;
-  current_road->data = weighted_init (current_road->length);
+  current_road->weighted = weighted_init (current_road->length);
   /*current_road->fork_list = (int *) malloc (sizeof (int) * TOTAL_DIRECTIONS * current_road->length);*/
   branch.length = 0;
   branch.list = malloc (sizeof (coordinate) * max_road_length);
@@ -167,7 +167,7 @@ void generate_branches_along (extended_map *extended_labyrinth, road *current_ro
     }
   max_road_length += current_road->length;
   /*free (current_road->fork_list);*/
-  free (current_road->data);
+  free (current_road->weighted);
   free (branch.list);
 }
 
@@ -292,7 +292,12 @@ int break_wall (extended_map *extended_labyrinth, road *current_road, coordinate
   coordinate current_position, next_position;
   map *labyrinth = extended_labyrinth->labyrinth;
 
-  if (current_road->length <= SHORT_ROAD)
+  if (current_road->length <= 2)
+    /* Road too short */
+    {
+      return 0;
+    }
+  else if (current_road->length <= SHORT_ROAD)
     {
       if (!probability_event (PROBABILITY_FORK_SHORT_ROAD))
         return 0;
@@ -305,7 +310,7 @@ int break_wall (extended_map *extended_labyrinth, road *current_road, coordinate
   while (1)
     {
       int index;
-      index = weighted_get (current_road->data);
+      index = weighted_get (current_road->weighted);
       current_position = current_road->list[index];
 
       reset_random_direction ();
@@ -317,7 +322,7 @@ int break_wall (extended_map *extended_labyrinth, road *current_road, coordinate
               set_land_type (labyrinth, next_position, ROAD);
               set_land_timestamp (labyrinth, next_position, get_timestamp ());
               current_road->forks++;
-              weighted_adjust (current_road->data, index);
+              weighted_adjust (current_road->weighted, index);
               generate_walls_around (extended_labyrinth, next_position);
               *position_p = next_position;
               return 1;
@@ -326,7 +331,7 @@ int break_wall (extended_map *extended_labyrinth, road *current_road, coordinate
 
       if (i == TOTAL_DIRECTIONS)
         {
-          if (!weighted_remove (current_road->data, index))
+          if (!weighted_remove (current_road->weighted, index))
             return 0;
         }
     }

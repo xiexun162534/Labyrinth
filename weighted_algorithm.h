@@ -1,21 +1,27 @@
 #ifndef __WEIGHTED_ALGORITHM_H
 #define __WEIGHTED_ALGORITHM_H
 
-typedef struct __WEIGHTED_DATA
+/* Works when count > 2 */
+/* build an N-ary tree */
+#define N 3
+#define PARENT(node) (((node) - 1) / (N))
+#define CHILD(i, node) ((node) * (N) + (i))
+
+typedef struct __WEIGHTED_TREE
 {
-  double sum;
-  double *weight_list;
+  double *data;
   int count;
-} weighted_data;
+  int base;
+} weighted_tree;
 
 
-weighted_data *weighted_init (int count);
+weighted_tree *weighted_init (int count);
 
-int weighted_get (weighted_data *current_data);
+int weighted_get (weighted_tree *current_tree);
 
-void weighted_adjust (weighted_data *current_data, int index);
+void weighted_adjust (weighted_tree *current_tree, int index);
 
-int weighted_remove (weighted_data *current_data, int index);
+int weighted_remove (weighted_tree *current_tree, int index);
 
 
 #endif
