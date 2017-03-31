@@ -75,8 +75,6 @@ int weighted_get (weighted_tree *current_tree)
         index = CHILD (N, index);
     }
 
-  if (index - current_tree->base >= current_tree->count)
-    printf ("%d,%d,OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOH!\n", index - current_tree->base, current_tree->count);
   return index - current_tree->base;
 }
 
