@@ -17,6 +17,8 @@ typedef struct __WEIGHTED_TREE
 
 weighted_tree *weighted_init (int count);
 
+void weighted_destroy (weighted_tree *current_tree);
+
 int weighted_get (weighted_tree *current_tree);
 
 void weighted_adjust (weighted_tree *current_tree, int index);

@@ -61,6 +61,7 @@ map *generate (int width, int height, coordinate entrance_position, coordinate e
 
   free (main_road.list);
   free (extended_labyrinth->checked_list);
+  free (extended_labyrinth);
 
   return labyrinth;
 }
@@ -167,7 +168,7 @@ void generate_branches_along (extended_map *extended_labyrinth, road *current_ro
     }
   max_road_length += current_road->length;
   /*free (current_road->fork_list);*/
-  free (current_road->weighted);
+  weighted_destroy (current_road->weighted);
   free (branch.list);
 }
 
