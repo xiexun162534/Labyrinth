@@ -127,12 +127,7 @@ void generate_branches_along (extended_map *extended_labyrinth, road *current_ro
   current_road->weighted = weighted_init (current_road->length);
   /*current_road->fork_list = (int *) malloc (sizeof (int) * TOTAL_DIRECTIONS * current_road->length);*/
   branch.length = 0;
-  branch.list = malloc (sizeof (coordinate) * max_road_length);
-  if (!branch.list)
-    {
-      printf ("ERROR: Cannot allocate memory.\n");
-      exit (1);
-    }
+  branch.list = current_road->list + current_road->length;
 
   while (break_wall (extended_labyrinth, current_road, &current_position))
     {
@@ -169,7 +164,6 @@ void generate_branches_along (extended_map *extended_labyrinth, road *current_ro
   max_road_length += current_road->length;
   /*free (current_road->fork_list);*/
   weighted_destroy (current_road->weighted);
-  free (branch.list);
 }
 
 int go_ahead (extended_map *extended_labyrinth, road *current_road, coordinate *current_position_p)
